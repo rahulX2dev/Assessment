@@ -87,6 +87,32 @@ function IconBase({ name, size = 20, className, strokeWidth = 1.7, ...rest }) {
 
 export const Icon = memo(IconBase)
 
+const brandPaths = {
+  github:
+    'M12 .5a11.5 11.5 0 0 0-3.64 22.42c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.54-3.88-1.54-.53-1.33-1.29-1.69-1.29-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.16 1.18a10.9 10.9 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.62 1.59.23 2.76.11 3.05.74.8 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z',
+  linkedin:
+    'M4.98 3.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0ZM.22 8.02h4.55V24H.22V8.02Zm7.4 0h4.36v2.18h.06c.61-1.15 2.1-2.37 4.32-2.37 4.62 0 5.47 3.04 5.47 6.99V24h-4.55v-7.27c0-1.73-.03-3.96-2.42-3.96-2.42 0-2.79 1.89-2.79 3.84V24H7.62V8.02Z',
+}
+
+export function BrandIcon({ name, size = 20, className }) {
+  const d = brandPaths[name]
+  if (!d) return null
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      className={cn('shrink-0', className)}
+    >
+      <path d={d} />
+    </svg>
+  )
+}
+
 export function StarIcon({ filled = true, size = 16, className }) {
   return (
     <svg

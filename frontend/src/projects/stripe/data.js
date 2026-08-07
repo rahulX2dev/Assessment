@@ -25,18 +25,18 @@ export const stripeNav = [
 ]
 
 export const stripeLogos = [
+  'shopify',
+  'mindbody',
+  'MetLife',
+  'ramp',
+  'MARRIOTT',
+  'Figma',
+  'woo',
+  'Vercel',
   'OpenAI',
   'amazon',
   'NVIDIA',
-  'Ford',
   'coinbase',
-  'Google',
-  'shopify',
-  'mindbody',
-  'Instacart',
-  'Linear',
-  'Ramp',
-  'Lightspeed',
 ]
 
 export const stripeProducts = [
