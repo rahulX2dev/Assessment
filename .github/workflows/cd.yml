@@ -1,0 +1,135 @@
+name: CD
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: staging
+        type: choice
+        options: [staging, production]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/hubflow
+
+jobs:
+  publish:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: gateway
+            dockerfile: deployment/docker/Dockerfile.gateway
+          - service: core
+            dockerfile: deployment/docker/Dockerfile.core
+          - service: ai
+            dockerfile: deployment/docker/Dockerfile.ai
+          - service: engine
+            dockerfile: deployment/docker/Dockerfile.engine
+          - service: frontend
+            dockerfile: deployment/docker/Dockerfile.frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          provenance: true
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:${{ github.ref_name }}
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+  deploy:
+    name: Roll out to EKS
+    runs-on: ubuntu-latest
+    needs: publish
+    environment: ${{ inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name hubflow-${{ inputs.environment || 'production' }} --region ap-south-1
+
+      - name: Apply manifests
+        run: kubectl apply -f deployment/k8s/ --namespace hubflow
+
+      - name: Set released image tags
+        run: |
+          TAG=${GITHUB_REF_NAME#v}
+          kubectl -n hubflow set image deployment/api-gateway  api-gateway=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-gateway:$TAG
+          kubectl -n hubflow set image deployment/core-service core-service=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-core:$TAG
+          kubectl -n hubflow set image deployment/ai-service   ai-service=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-ai:$TAG
+          kubectl -n hubflow set image deployment/frontend     frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:$TAG
+
+      - name: Wait for rollout
+        run: |
+          for deployment in api-gateway core-service ai-service frontend; do
+            kubectl -n hubflow rollout status deployment/$deployment --timeout=5m
+          done
+
+      - name: Verify health through the ingress
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS https://app.hubflow.io/api/health >/dev/null; then
+              echo "health check passed"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "health check never passed"
+          exit 1
+
+      - name: Roll back on failure
+        if: failure()
+        run: |
+          for deployment in api-gateway core-service ai-service frontend; do
+            kubectl -n hubflow rollout undo deployment/$deployment || true
+          done

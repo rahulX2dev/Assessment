@@ -1,0 +1,24 @@
+{
+  "name": "hubflow-api-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Edge API gateway for the Hubflow Automation platform",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hubflow
+  labels:
+    name: hubflow
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hubflow-config
+  namespace: hubflow
+data:
+  CORE_SERVICE_URL: "http://core-service:8081"
+  AI_SERVICE_URL: "http://ai-service:8000"
+  REDIS_URL: "redis://redis:6379"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  MYSQL_HOST: "mysql"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: "hubflow"
+  CORS_ORIGINS: "https://app.hubflow.io"
+  SPRING_PROFILES_ACTIVE: "prod"
+  APP_ENV: "production"
+  NODE_ENV: "production"
+  RATE_LIMIT_MAX: "120"
+  RATE_LIMIT_AUTH_MAX: "10"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hubflow-secrets
+  namespace: hubflow
+type: Opaque
+stringData:
+  JWT_SECRET: "replace-via-sealed-secret-or-external-secrets-operator"
+  INTERNAL_SERVICE_TOKEN: "replace-via-sealed-secret-or-external-secrets-operator"
+  MYSQL_USER: "hubflow"
+  MYSQL_PASSWORD: "replace-me"
+  POSTGRES_DSN: "postgresql+psycopg://hubflow:replace-me@postgres:5432/hubflow_analytics"
+  WHATSAPP_ACCESS_TOKEN: "replace-me"
+  WHATSAPP_PHONE_NUMBER_ID: "replace-me"
+  WHATSAPP_VERIFY_TOKEN: "replace-me"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: hubflow-quota
+  namespace: hubflow
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    persistentvolumeclaims: "6"

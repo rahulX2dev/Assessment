@@ -1,0 +1,1050 @@
+﻿{
+  "info": {
+    "name": "Hubflow Automation API",
+    "description": "End-to-end collection for the Hubflow platform. Requests are ordered so that running the folder top to bottom registers a tenant, verifies OTP, builds a CRM record, dispatches a campaign, subscribes to a plan and exercises the AI service. Tokens and ids are captured into collection variables automatically.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gatewayUrl", "value": "http://localhost:8080/api" },
+    { "key": "coreUrl", "value": "http://localhost:8081" },
+    { "key": "aiUrl", "value": "http://localhost:8000" },
+    { "key": "internalToken", "value": "shared-secret-between-internal-services" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "tenantId", "value": "" },
+    { "key": "contactId", "value": "" },
+    { "key": "dealId", "value": "" },
+    { "key": "templateId", "value": "" },
+    { "key": "campaignId", "value": "" },
+    { "key": "employeeId", "value": "" },
+    { "key": "leaveId", "value": "" },
+    { "key": "otpCode", "value": "" },
+    { "key": "testEmail", "value": "" },
+    { "key": "testPhone", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('testEmail')) {",
+          "    const suffix = Math.floor(Math.random() * 90000) + 10000;",
+          "    pm.collectionVariables.set('testEmail', `owner${suffix}@acme-retail.in`);",
+          "    pm.collectionVariables.set('testPhone', `+91981234${suffix}`);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Gateway health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{gatewayUrl}}/health", "host": ["{{gatewayUrl}}"], "path": ["health"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('gateway is up', () => pm.response.to.have.status(200));",
+                  "pm.test('reports service name', () => {",
+                  "    pm.expect(pm.response.json().data.service).to.eql('api-gateway');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Gateway readiness",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{gatewayUrl}}/health/ready", "host": ["{{gatewayUrl}}"], "path": ["health", "ready"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns upstream and circuit state', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data).to.have.property('upstreams');",
+                  "    pm.expect(body.data).to.have.property('circuits');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AI service health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{aiUrl}}/health", "host": ["{{aiUrl}}"], "path": ["health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register tenant and owner",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Rahul Pathak\",\n  \"email\": \"{{testEmail}}\",\n  \"phone\": \"{{testPhone}}\",\n  \"password\": \"StrongPassw0rd!\",\n  \"companyName\": \"Acme Retail Pvt Ltd\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/auth/register", "host": ["{{gatewayUrl}}"], "path": ["v1", "auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', data.refreshToken);",
+                  "pm.collectionVariables.set('tenantId', data.user.tenantId);",
+                  "pm.test('owner and admin roles granted', () => {",
+                  "    pm.expect(data.user.roles).to.include.members(['OWNER', 'ADMIN']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register duplicate email (expect 409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Duplicate\",\n  \"email\": \"{{testEmail}}\",\n  \"phone\": \"+919876500000\",\n  \"password\": \"StrongPassw0rd!\",\n  \"companyName\": \"Duplicate Co\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/auth/register", "host": ["{{gatewayUrl}}"], "path": ["v1", "auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejected as conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('error code is CONFLICT', () => {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('CONFLICT');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register with invalid payload (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"X\",\n  \"email\": \"not-an-email\",\n  \"phone\": \"123\",\n  \"password\": \"short\",\n  \"companyName\": \"Y\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/auth/register", "host": ["{{gatewayUrl}}"], "path": ["v1", "auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('validation rejected', () => pm.response.to.have.status(400));",
+                  "pm.test('names the offending fields', () => {",
+                  "    const details = pm.response.json().error.details;",
+                  "    pm.expect(Object.keys(details)).to.include.members(['email', 'password']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"StrongPassw0rd!\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/auth/login", "host": ["{{gatewayUrl}}"], "path": ["v1", "auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('signed in', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', data.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{testPhone}}\",\n  \"purpose\": \"PHONE_VERIFICATION\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/auth/otp/send", "host": ["{{gatewayUrl}}"], "path": ["v1", "auth", "otp", "send"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('otp issued', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('phone is masked in the response', () => {",
+                  "    pm.expect(data.phone).to.include('*');",
+                  "});",
+                  "if (data.devCode) {",
+                  "    pm.collectionVariables.set('otpCode', data.devCode);",
+                  "} else {",
+                  "    console.log('devCode hidden: set hubflow.otp.expose-code=true in the dev profile');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{testPhone}}\",\n  \"code\": \"{{otpCode}}\",\n  \"purpose\": \"PHONE_VERIFICATION\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/auth/otp/verify", "host": ["{{gatewayUrl}}"], "path": ["v1", "auth", "otp", "verify"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('phone verified', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current profile",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{gatewayUrl}}/v1/auth/me", "host": ["{{gatewayUrl}}"], "path": ["v1", "auth", "me"] }
+          }
+        },
+        {
+          "name": "Refresh tokens",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" },
+            "url": { "raw": "{{gatewayUrl}}/v1/auth/refresh", "host": ["{{gatewayUrl}}"], "path": ["v1", "auth", "refresh"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rotated', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', data.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unauthenticated request (expect 401)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{gatewayUrl}}/v1/crm/contacts", "host": ["{{gatewayUrl}}"], "path": ["v1", "crm", "contacts"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejected without a token', () => pm.response.to.have.status(401));",
+                  "pm.test('error code is UNAUTHORIZED', () => {",
+                  "    pm.expect(pm.response.json().error.code).to.eql('UNAUTHORIZED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CRM",
+      "item": [
+        {
+          "name": "Create contact",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Meera Joshi\",\n  \"phone\": \"+919812345678\",\n  \"email\": \"meera@nexora.in\",\n  \"companyName\": \"Nexora Retail\",\n  \"source\": \"landing_page\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/crm/contacts", "host": ["{{gatewayUrl}}"], "path": ["v1", "crm", "contacts"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('contactId', data.id);",
+                  "pm.test('starts in the NEW stage', () => pm.expect(data.lifecycleStage).to.eql('NEW'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search contacts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gatewayUrl}}/v1/crm/contacts?page=0&size=20&search=meera",
+              "host": ["{{gatewayUrl}}"],
+              "path": ["v1", "crm", "contacts"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "search", "value": "meera" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns pagination meta', () => {",
+                  "    pm.expect(pm.response.json().meta).to.have.property('totalElements');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Duplicate phone (expect 409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Duplicate Contact\",\n  \"phone\": \"+919812345678\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/crm/contacts", "host": ["{{gatewayUrl}}"], "path": ["v1", "crm", "contacts"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('conflict on duplicate phone', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create deal",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contactId\": \"{{contactId}}\",\n  \"title\": \"Annual Growth plan\",\n  \"value\": 95988,\n  \"stage\": \"QUALIFIED\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/crm/deals", "host": ["{{gatewayUrl}}"], "path": ["v1", "crm", "deals"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('dealId', data.id);",
+                  "pm.test('probability derived from stage', () => pm.expect(data.winProbability).to.eql(30));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Move deal to NEGOTIATION",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"stage\": \"NEGOTIATION\"\n}" },
+            "url": {
+              "raw": "{{gatewayUrl}}/v1/crm/deals/{{dealId}}/stage",
+              "host": ["{{gatewayUrl}}"],
+              "path": ["v1", "crm", "deals", "{{dealId}}", "stage"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('probability updated to 75', () => {",
+                  "    pm.expect(pm.response.json().data.winProbability).to.eql(75);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark LOST without reason (expect 400)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"stage\": \"LOST\"\n}" },
+            "url": {
+              "raw": "{{gatewayUrl}}/v1/crm/deals/{{dealId}}/stage",
+              "host": ["{{gatewayUrl}}"],
+              "path": ["v1", "crm", "deals", "{{dealId}}", "stage"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('lostReason is enforced', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Campaigns",
+      "item": [
+        {
+          "name": "Create template",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"monsoon_offer\",\n  \"language\": \"en\",\n  \"category\": \"MARKETING\",\n  \"bodyText\": \"Hi, our monsoon sale is live with up to 45% off.\"\n}"
+            },
+            "url": {
+              "raw": "{{coreUrl}}/api/v1/campaigns/templates",
+              "host": ["{{coreUrl}}"],
+              "path": ["api", "v1", "campaigns", "templates"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('templateId', data.id);",
+                  "pm.test('starts PENDING approval', () => pm.expect(data.approvalStatus).to.eql('PENDING'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campaign on unapproved template (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Monsoon push\",\n  \"templateId\": \"{{templateId}}\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/campaigns", "host": ["{{gatewayUrl}}"], "path": ["v1", "campaigns"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('blocked until approved', () => pm.response.to.have.status(400));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve template",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{coreUrl}}/api/v1/campaigns/templates/{{templateId}}/approval?status=APPROVED",
+              "host": ["{{coreUrl}}"],
+              "path": ["api", "v1", "campaigns", "templates", "{{templateId}}", "approval"],
+              "query": [{ "key": "status", "value": "APPROVED" }]
+            }
+          }
+        },
+        {
+          "name": "Create campaign",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Monsoon push\",\n  \"templateId\": \"{{templateId}}\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/campaigns", "host": ["{{gatewayUrl}}"], "path": ["v1", "campaigns"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('created', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('campaignId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dispatch campaign",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{gatewayUrl}}/v1/campaigns/{{campaignId}}/dispatch",
+              "host": ["{{gatewayUrl}}"],
+              "path": ["v1", "campaigns", "{{campaignId}}", "dispatch"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('accepted for dispatch', () => pm.response.to.have.status(202));",
+                  "const data = pm.response.json().data;",
+                  "pm.test('reports queued recipients and a batch id', () => {",
+                  "    pm.expect(data.queuedRecipients).to.be.above(0);",
+                  "    pm.expect(data.queueBatchId).to.include('batch_');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dispatch again (expect 409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{gatewayUrl}}/v1/campaigns/{{campaignId}}/dispatch",
+              "host": ["{{gatewayUrl}}"],
+              "path": ["v1", "campaigns", "{{campaignId}}", "dispatch"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('double dispatch blocked', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campaign stats",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gatewayUrl}}/v1/campaigns/{{campaignId}}/stats",
+              "host": ["{{gatewayUrl}}"],
+              "path": ["v1", "campaigns", "{{campaignId}}", "stats"]
+            }
+          }
+        },
+        {
+          "name": "WhatsApp delivery webhook",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entry\": [\n    {\n      \"changes\": [\n        {\n          \"value\": {\n            \"statuses\": [\n              { \"id\": \"wamid.demo.1\", \"status\": \"delivered\" },\n              { \"id\": \"wamid.demo.2\", \"status\": \"read\" }\n            ]\n          }\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{coreUrl}}/api/v1/webhooks/whatsapp",
+              "host": ["{{coreUrl}}"],
+              "path": ["api", "v1", "webhooks", "whatsapp"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "Plan catalogue (public)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{gatewayUrl}}/v1/billing/plans", "host": ["{{gatewayUrl}}"], "path": ["v1", "billing", "plans"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('three plans returned', () => {",
+                  "    pm.expect(pm.response.json().data).to.have.lengthOf(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Subscribe to Growth yearly",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"planId\": \"growth\",\n  \"billingCycle\": \"YEARLY\"\n}" },
+            "url": { "raw": "{{gatewayUrl}}/v1/billing/subscription", "host": ["{{gatewayUrl}}"], "path": ["v1", "billing", "subscription"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('subscription is active', () => pm.expect(pm.response.json().data.status).to.eql('ACTIVE'));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invoices",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{gatewayUrl}}/v1/billing/invoices", "host": ["{{gatewayUrl}}"], "path": ["v1", "billing", "invoices"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const invoice = pm.response.json().data[0];",
+                  "pm.test('GST is 18 percent of the net amount', () => {",
+                  "    const net = Number(invoice.platformAmount) + Number(invoice.conversationAmount);",
+                  "    pm.expect(Number(invoice.taxAmount)).to.be.closeTo(net * 0.18, 0.05);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Usage against allowance",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{gatewayUrl}}/v1/billing/usage", "host": ["{{gatewayUrl}}"], "path": ["v1", "billing", "usage"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "HRMS",
+      "item": [
+        {
+          "name": "Create employee",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeCode\": \"EMP001\",\n  \"fullName\": \"Karan Shah\",\n  \"email\": \"karan@acme-retail.in\",\n  \"department\": \"Sales\",\n  \"designation\": \"Account Executive\",\n  \"dateOfJoining\": \"2025-04-01\",\n  \"annualCtc\": 1200000\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/hrms/employees", "host": ["{{gatewayUrl}}"], "path": ["v1", "hrms", "employees"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('employeeId', data.id);",
+                  "pm.test('opens with 24 leave days', () => pm.expect(data.leaveBalance).to.eql(24));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apply for leave",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeId\": \"{{employeeId}}\",\n  \"leaveType\": \"CASUAL\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2026-09-03\",\n  \"reason\": \"Family function\"\n}"
+            },
+            "url": { "raw": "{{gatewayUrl}}/v1/hrms/leave", "host": ["{{gatewayUrl}}"], "path": ["v1", "hrms", "leave"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('leaveId', data.id);",
+                  "pm.test('three days counted inclusively', () => pm.expect(data.dayCount).to.eql(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve leave",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"APPROVED\"\n}" },
+            "url": {
+              "raw": "{{gatewayUrl}}/v1/hrms/leave/{{leaveId}}",
+              "host": ["{{gatewayUrl}}"],
+              "path": ["v1", "hrms", "leave", "{{leaveId}}"]
+            }
+          }
+        },
+        {
+          "name": "Decide again (expect 409)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"REJECTED\"\n}" },
+            "url": {
+              "raw": "{{gatewayUrl}}/v1/hrms/leave/{{leaveId}}",
+              "host": ["{{gatewayUrl}}"],
+              "path": ["v1", "hrms", "leave", "{{leaveId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('already decided', () => pm.response.to.have.status(409));"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AI service",
+      "item": [
+        {
+          "name": "Classify a payment plan request",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"text\": \"Can I pay in two instalments instead of the full amount?\"\n}" },
+            "url": {
+              "raw": "{{aiUrl}}/api/v1/assistant/classify",
+              "host": ["{{aiUrl}}"],
+              "path": ["api", "v1", "assistant", "classify"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.test('routed to finance', () => {",
+                  "    pm.expect(data.intent).to.eql('payment_plan_request');",
+                  "    pm.expect(data.routing_queue).to.eql('finance');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Assistant chat",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"The campaign dashboard is broken and throws an error\",\n  \"contactId\": \"{{contactId}}\"\n}"
+            },
+            "url": { "raw": "{{aiUrl}}/api/v1/assistant/chat", "host": ["{{aiUrl}}"], "path": ["api", "v1", "assistant", "chat"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.test('support issues escalate to a human', () => {",
+                  "    pm.expect(data.intent).to.eql('support_issue');",
+                  "    pm.expect(data.escalate_to_human).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Score a hot lead",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contactId\": \"{{contactId}}\",\n  \"replies\": 4,\n  \"pageViews\": 6,\n  \"daysSinceLastTouch\": 1,\n  \"openedPricing\": true,\n  \"companySize\": 120\n}"
+            },
+            "url": { "raw": "{{aiUrl}}/api/v1/assistant/score", "host": ["{{aiUrl}}"], "path": ["api", "v1", "assistant", "score"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.test('banded hot', () => {",
+                  "    pm.expect(data.band).to.eql('hot');",
+                  "    pm.expect(data.score).to.be.at.least(75);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recommendations",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{aiUrl}}/api/v1/recommendations/{{contactId}}?replies=4&page_views=6&days_since_last_touch=1&opened_pricing=true",
+              "host": ["{{aiUrl}}"],
+              "path": ["api", "v1", "recommendations", "{{contactId}}"],
+              "query": [
+                { "key": "replies", "value": "4" },
+                { "key": "page_views", "value": "6" },
+                { "key": "days_since_last_touch", "value": "1" },
+                { "key": "opened_pricing", "value": "true" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Dashboard analytics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{aiUrl}}/api/v1/analytics/dashboard?window_days=14",
+              "host": ["{{aiUrl}}"],
+              "path": ["api", "v1", "analytics", "dashboard"],
+              "query": [{ "key": "window_days", "value": "14" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json().data;",
+                  "pm.test('returns a full daily series', () => pm.expect(data.series).to.have.lengthOf(14));",
+                  "console.log(data.totals.source_is_live === 1 ? 'live from postgres' : 'modelled fallback');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "OCR extraction",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"fileId\": \"sample-invoice.txt\",\n  \"documentType\": \"invoice\"\n}" },
+            "url": { "raw": "{{aiUrl}}/api/v1/ocr/extract", "host": ["{{aiUrl}}"], "path": ["api", "v1", "ocr", "extract"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('extracts an invoice number and GSTIN', () => {",
+                  "    const fields = pm.response.json().data.fields;",
+                  "    pm.expect(fields).to.have.property('invoice_number');",
+                  "    pm.expect(fields).to.have.property('gstin');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Trigger a background job (internal)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "x-internal-token", "value": "{{internalToken}}" }],
+            "url": {
+              "raw": "{{aiUrl}}/api/v1/jobs/rebuild_daily_metrics/run",
+              "host": ["{{aiUrl}}"],
+              "path": ["api", "v1", "jobs", "rebuild_daily_metrics", "run"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('job succeeded', () => pm.expect(pm.response.json().data.state).to.eql('succeeded'));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Job without internal token (expect 403)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": {
+              "raw": "{{aiUrl}}/api/v1/jobs/rebuild_daily_metrics/run",
+              "host": ["{{aiUrl}}"],
+              "path": ["api", "v1", "jobs", "rebuild_daily_metrics", "run"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('internal guard holds', () => pm.response.to.have.status(403));"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Uploads and reports",
+      "item": [
+        {
+          "name": "Upload contacts CSV",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "samples/contacts.csv", "description": "Use samples/contacts.csv from the repository" }
+              ]
+            },
+            "url": {
+              "raw": "{{gatewayUrl}}/v1/uploads/contacts/csv",
+              "host": ["{{gatewayUrl}}"],
+              "path": ["v1", "uploads", "contacts", "csv"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('accepted', () => pm.response.to.have.status(201));",
+                  "pm.test('returns a preview and row count', () => {",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.totalRows).to.be.above(0);",
+                  "    pm.expect(data.preview).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tenant report summary",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{gatewayUrl}}/v1/reports/summary", "host": ["{{gatewayUrl}}"], "path": ["v1", "reports", "summary"] }
+          }
+        }
+      ]
+    }
+  ]
+}
+

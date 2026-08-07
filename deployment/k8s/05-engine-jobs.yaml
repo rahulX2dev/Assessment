@@ -1,0 +1,104 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: campaign-engine-sweep
+  namespace: hubflow
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: engine
+              image: ghcr.io/hubunicon/hubflow-engine:1.0.0
+              args:
+                - "--input"
+                - "/app/inbox/contacts.csv"
+                - "--out"
+                - "/app/reports"
+                - "--campaign"
+                - "cmp_scheduled"
+                - "--format"
+                - "json"
+                - "--workers"
+                - "8"
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 256Mi
+                limits:
+                  cpu: 2000m
+                  memory: 1Gi
+              volumeMounts:
+                - name: uploads
+                  mountPath: /app/inbox
+                - name: reports
+                  mountPath: /app/reports
+          volumes:
+            - name: uploads
+              persistentVolumeClaim:
+                claimName: uploads-pvc
+            - name: reports
+              persistentVolumeClaim:
+                claimName: reports-pvc
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: delivery-report-rollup
+  namespace: hubflow
+spec:
+  schedule: "15 1 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: fileops
+              image: ghcr.io/hubunicon/hubflow-engine:1.0.0
+              command: ["hubflow_fileops"]
+              args:
+                - "report"
+                - "--input"
+                - "/app/reports/cmp_scheduled_report.csv"
+                - "--out"
+                - "/app/reports/daily_summary.txt"
+                - "--campaign"
+                - "cmp_scheduled"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+              volumeMounts:
+                - name: reports
+                  mountPath: /app/reports
+          volumes:
+            - name: reports
+              persistentVolumeClaim:
+                claimName: reports-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: reports-pvc
+  namespace: hubflow
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: efs-sc

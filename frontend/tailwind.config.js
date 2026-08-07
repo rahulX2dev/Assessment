@@ -1,0 +1,107 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,jsx}'],
+  theme: {
+    borderRadius: {
+      none: '0',
+      sm: '2px',
+      DEFAULT: '4px',
+      md: '6px',
+      lg: '8px',
+      full: '9999px',
+    },
+    extend: {
+      colors: {
+        hub: {
+          50: '#eef2ff',
+          100: '#e0e7ff',
+          200: '#c7d2fe',
+          300: '#a5b4fc',
+          400: '#818cf8',
+          500: '#6366f1',
+          600: '#4f46e5',
+          700: '#4338ca',
+          800: '#3730a3',
+          900: '#312e81',
+          950: '#1e1b4b',
+        },
+        ink: {
+          50: '#f6f7f9',
+          100: '#eceef2',
+          200: '#d5d9e2',
+          300: '#b0b8c9',
+          400: '#8591aa',
+          500: '#66738f',
+          600: '#515c76',
+          700: '#424b60',
+          800: '#3a4051',
+          900: '#0b1020',
+          950: '#05070f',
+        },
+        pw: {
+          50: '#f4f2ff',
+          100: '#ebe7ff',
+          200: '#d8d0ff',
+          300: '#bcabff',
+          400: '#9b7dff',
+          500: '#7d54fb',
+          600: '#5c3fd8',
+          700: '#4d33b5',
+          800: '#402c94',
+          900: '#362778',
+          950: '#20154a',
+        },
+        pwink: '#1b1b2f',
+        pwsurface: '#f8f6ff',
+        stripe: {
+          brand: '#635bff',
+          deep: '#0a2540',
+          slate: '#425466',
+          mist: '#f6f9fc',
+          cyan: '#00d4ff',
+          night: '#101a3d',
+          nightcard: '#17224b',
+          nighttext: '#a6b1de',
+        },
+        shop: {
+          accent: '#c2410c',
+          soft: '#fff7ed',
+          deep: '#1c1917',
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['Sora', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      maxWidth: {
+        shell: '1200px',
+      },
+      boxShadow: {
+        card: '0 1px 2px rgba(16, 24, 40, 0.05), 0 8px 24px -12px rgba(16, 24, 40, 0.14)',
+        lift: '0 2px 4px rgba(16, 24, 40, 0.04), 0 18px 40px -16px rgba(16, 24, 40, 0.22)',
+        ring: '0 0 0 1px rgba(16, 24, 40, 0.06)',
+      },
+      keyframes: {
+        rise: {
+          from: { opacity: '0', transform: 'translateY(14px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        marquee: {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(-50%)' },
+        },
+        pulseSoft: {
+          '0%, 100%': { opacity: '0.55' },
+          '50%': { opacity: '1' },
+        },
+      },
+      animation: {
+        rise: 'rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both',
+        marquee: 'marquee 32s linear infinite',
+        pulseSoft: 'pulseSoft 2.4s ease-in-out infinite',
+      },
+    },
+  },
+  plugins: [],
+}

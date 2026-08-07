@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-service
+  namespace: hubflow
+  labels:
+    app: ai-service
+    tier: backend
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: ai-service
+  template:
+    metadata:
+      labels:
+        app: ai-service
+        tier: backend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: ai-service
+          image: ghcr.io/hubunicon/hubflow-ai:1.0.0
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: hubflow-config
+            - secretRef:
+                name: hubflow-secrets
+          env:
+            - name: SCHEDULER_ENABLED
+              value: "false"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-service
+  namespace: hubflow
+spec:
+  selector:
+    app: ai-service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-scheduler
+  namespace: hubflow
+  labels:
+    app: ai-scheduler
+    tier: worker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ai-scheduler
+  template:
+    metadata:
+      labels:
+        app: ai-scheduler
+        tier: worker
+    spec:
+      containers:
+        - name: ai-scheduler
+          image: ghcr.io/hubunicon/hubflow-ai:1.0.0
+          envFrom:
+            - configMapRef:
+                name: hubflow-config
+            - secretRef:
+                name: hubflow-secrets
+          env:
+            - name: SCHEDULER_ENABLED
+              value: "true"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ai-service
+  namespace: hubflow
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ai-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75

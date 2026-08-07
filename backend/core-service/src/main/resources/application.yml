@@ -1,0 +1,87 @@
+spring:
+  application:
+    name: hubflow-core-service
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+
+server:
+  port: ${SERVER_PORT:8081}
+  error:
+    include-message: never
+    include-stacktrace: never
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+hubflow:
+  security:
+    jwt-secret: ${JWT_SECRET:change-me-in-production-min-32-chars-long}
+    jwt-issuer: ${JWT_ISSUER:hubflow-core}
+    access-token-minutes: ${ACCESS_TOKEN_MINUTES:15}
+    refresh-token-days: ${REFRESH_TOKEN_DAYS:30}
+    internal-token: ${INTERNAL_SERVICE_TOKEN:shared-secret-between-internal-services}
+    max-failed-logins: 5
+    lockout-minutes: 15
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:4173
+      - http://localhost:8080
+
+  otp:
+    expose-code: ${OTP_EXPOSE_CODE:false}
+
+  whatsapp:
+    enabled: ${WHATSAPP_ENABLED:false}
+    api-version: v21.0
+    base-url: https://graph.facebook.com
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+    access-token: ${WHATSAPP_ACCESS_TOKEN:}
+    verify-token: ${WHATSAPP_VERIFY_TOKEN:hubflow-webhook-verify}
+    otp-template-name: hubflow_otp
+    timeout-seconds: 10
+
+logging:
+  level:
+    root: INFO
+    io.hubflow.core: DEBUG
+    org.hibernate.SQL: WARN

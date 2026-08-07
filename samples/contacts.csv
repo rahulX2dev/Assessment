@@ -1,0 +1,26 @@
+id,name,phone,email,segment,replies,page_views,days_since_last_touch,opened_pricing,opted_out
+CNT-1001,Meera Joshi,+919812345678,meera@nexora.in,retail,4,7,1,true,false
+CNT-1002,Arjun Bhatt,9876501234,arjun@bluepeak.co.in,realty,2,3,4,true,false
+CNT-1003,Sneha Kulkarni,+919900112233,sneha@carepoint.health,healthcare,6,11,1,true,false
+CNT-1004,Rohit Meena,9812004455,rohit@marigold.foods,retail,0,1,45,false,false
+CNT-1005,Nikita Sahu,+919845567788,nikita@orbitfin.com,fintech,3,5,2,false,false
+CNT-1006,Karan Shah,9820011223,karan@zentro.logistics,logistics,1,2,12,false,false
+CNT-1007,Ananya Rao,+919701122334,ananya@vidyapeeth.edu,edtech,8,14,1,true,false
+CNT-1008,Vikram Sethi,9833445566,vikram@northbay.in,retail,0,0,120,false,true
+CNT-1009,Priya Nair,+919656778899,priya@aurelia.co,retail,2,4,6,false,false
+CNT-1010,Devansh Gupta,9811223344,devansh@kanvas.store,retail,5,9,3,true,false
+CNT-1011,Ritika Menon,+919845001122,ritika@vidyapeeth.edu,edtech,7,12,1,true,false
+CNT-1012,Sameer Kulkarni,9922334455,sameer@studio9.design,creative,1,1,30,false,false
+CNT-1013,Farhan Qureshi,+919833667788,farhan@elmoak.in,retail,3,6,5,true,false
+CNT-1014,Tanya Bansal,9800112233,tanya@halcyon.travel,travel,0,2,18,false,false
+CNT-1015,Aditya Verma,+919812009988,aditya@vireo.ai,saas,9,18,1,true,false
+CNT-1016,Neha Deshmukh,invalid-number,neha@broken.example,retail,2,3,7,false,false
+CNT-1017,Manish Tiwari,9845998877,manish@zentro.logistics,logistics,4,8,2,true,false
+CNT-1018,Kavya Iyer,+919656112233,kavya@carepoint.health,healthcare,5,10,3,true,false
+CNT-1019,Rahul Pathak,9811009900,rahul@orbitfin.com,fintech,1,3,9,false,false
+CNT-1020,Sanya Gupta,+919877665544,sanya@vidyapeeth.edu,edtech,6,13,1,true,false
+CNT-1021,Imran Sheikh,9900887766,imran@northbay.in,retail,0,1,60,false,true
+CNT-1022,Pooja Rane,+919845332211,pooja@aurelia.co,retail,2,5,8,false,false
+CNT-1023,Harsh Vardhan,9812876543,harsh@bluepeak.co.in,realty,3,7,4,true,false
+CNT-1024,Lakshmi Menon,+919701998877,lakshmi@marigold.foods,retail,1,2,22,false,false
+CNT-1025,Yash Agarwal,9833221100,yash@vireo.ai,saas,7,15,1,true,false

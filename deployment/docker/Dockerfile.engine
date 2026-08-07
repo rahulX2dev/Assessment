@@ -1,0 +1,29 @@
+FROM gcc:13 AS build
+WORKDIR /build
+
+COPY backend/engine-cpp/include ./engine-cpp/include
+COPY backend/engine-cpp/src ./engine-cpp/src
+COPY backend/engine-cpp/Makefile ./engine-cpp/Makefile
+
+COPY backend/fileops-c/include ./fileops-c/include
+COPY backend/fileops-c/src ./fileops-c/src
+COPY backend/fileops-c/Makefile ./fileops-c/Makefile
+
+RUN make -C engine-cpp all && make -C fileops-c all
+
+FROM debian:bookworm-slim AS runtime
+RUN groupadd -r hubflow && useradd -r -g hubflow hubflow \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends libstdc++6 \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=build /build/engine-cpp/bin/hubflow_engine /usr/local/bin/hubflow_engine
+COPY --from=build /build/fileops-c/bin/hubflow_fileops /usr/local/bin/hubflow_fileops
+
+RUN mkdir -p /app/inbox /app/reports && chown -R hubflow:hubflow /app
+
+USER hubflow
+
+ENTRYPOINT ["hubflow_engine"]
+CMD ["--help"]
