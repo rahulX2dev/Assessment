@@ -84,56 +84,56 @@ function SystemsDiagram() {
   )
 }
 
+const warmStrands = Array.from({ length: 42 }, (_, index) => {
+  const t = index / 41
+  return {
+    key: `warm-${index}`,
+    d: `M0 ${262 + t * 62} C 340 ${312 + t * 70}, 720 ${138 + t * 46}, 1200 ${292 + t * 118}`,
+  }
+})
+
+const coolStrands = Array.from({ length: 58 }, (_, index) => {
+  const t = index / 57
+  return {
+    key: `cool-${index}`,
+    d: `M0 ${300 + t * 34} C 400 ${338 + t * 26}, 820 ${236 - t * 52}, 1200 ${18 + t * 250}`,
+  }
+})
+
 function ScaleWave() {
   return (
     <svg
-      className="h-56 w-full sm:h-72"
-      viewBox="0 0 1200 320"
+      className="h-64 w-full sm:h-80 lg:h-[26rem]"
+      viewBox="0 0 1200 460"
       preserveAspectRatio="none"
       aria-hidden="true"
     >
       <defs>
         <linearGradient id="wave-warm" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#f97316" stopOpacity="0.15" />
-          <stop offset="45%" stopColor="#fb7185" stopOpacity="0.85" />
-          <stop offset="100%" stopColor="#a855f7" stopOpacity="0.25" />
+          <stop offset="0%" stopColor="#4c1d95" stopOpacity="0.55" />
+          <stop offset="22%" stopColor="#f97316" stopOpacity="0.85" />
+          <stop offset="44%" stopColor="#fb7185" stopOpacity="1" />
+          <stop offset="62%" stopColor="#ec4899" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="#4c1d95" stopOpacity="0.35" />
         </linearGradient>
+
         <linearGradient id="wave-cool" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.2" />
-          <stop offset="50%" stopColor="#c026d3" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.25" />
+          <stop offset="0%" stopColor="#1e1b4b" stopOpacity="0.7" />
+          <stop offset="28%" stopColor="#6d28d9" stopOpacity="0.85" />
+          <stop offset="52%" stopColor="#d946ef" stopOpacity="1" />
+          <stop offset="74%" stopColor="#8b5cf6" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#4338ca" stopOpacity="0.7" />
         </linearGradient>
       </defs>
 
-      {Array.from({ length: 26 }, (_, index) => {
-        const offset = index * 4
-        return (
-          <path
-            key={`warm-${index}`}
-            d={`M0 ${210 + offset * 0.5} C 300 ${170 + offset}, 620 ${120 + offset * 0.4}, 1200 ${
-              250 - offset * 0.8
-            }`}
-            fill="none"
-            stroke="url(#wave-warm)"
-            strokeWidth="1"
-          />
-        )
-      })}
-
-      {Array.from({ length: 26 }, (_, index) => {
-        const offset = index * 4
-        return (
-          <path
-            key={`cool-${index}`}
-            d={`M0 ${250 - offset * 0.2} C 380 ${230 - offset * 0.6}, 700 ${90 + offset}, 1200 ${
-              120 + offset * 0.9
-            }`}
-            fill="none"
-            stroke="url(#wave-cool)"
-            strokeWidth="1"
-          />
-        )
-      })}
+      <g fill="none" strokeWidth="1.1">
+        {warmStrands.map((strand) => (
+          <path key={strand.key} d={strand.d} stroke="url(#wave-warm)" />
+        ))}
+        {coolStrands.map((strand) => (
+          <path key={strand.key} d={strand.d} stroke="url(#wave-cool)" />
+        ))}
+      </g>
     </svg>
   )
 }
